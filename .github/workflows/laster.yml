@@ -1,0 +1,169 @@
+name: Laster 预发布
+
+# 每次推送到 main 时并行构建 Linux 与 Windows，打包后覆盖写入名为 Laster 的预发行版。
+# Laster tag 始终指向最新提交，发行正文动态写入构建时间。
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+# 新推送到来时取消正在跑的旧 run，确保 Laster 始终对应最新提交
+concurrency:
+  group: laster-release
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: 构建 ${{ matrix.platform }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-22.04
+            platform: linux
+            pkg: breeze-tts-2-laster-linux-x64-vulkan
+            archive: tar.gz
+          - os: windows-latest
+            platform: windows
+            pkg: breeze-tts-2-laster-windows-x64-vulkan
+            archive: zip
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      # ============ Linux ============
+      - name: 安装依赖 (Linux)
+        if: matrix.platform == 'linux'
+        run: |
+          wget -qO - https://packages.lunarg.com/lunarg-signing-key-pub.asc | sudo apt-key add -
+          sudo wget -qO /etc/apt/sources.list.d/lunarg-vulkan-jammy.list https://packages.lunarg.com/vulkan/lunarg-vulkan-jammy.list
+          sudo apt-get update -y
+          sudo apt-get install -y build-essential ninja-build vulkan-sdk ccache
+
+      - name: ccache 缓存 (Linux)
+        if: matrix.platform == 'linux'
+        uses: actions/cache@v4
+        with:
+          path: /home/runner/.ccache
+          key: ccache-linux-${{ github.sha }}
+          restore-keys: ccache-linux-
+
+      - name: 构建 (Linux)
+        if: matrix.platform == 'linux'
+        run: |
+          export CCACHE_DIR="$HOME/.ccache"
+          mkdir -p "$CCACHE_DIR"
+          cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \
+            -DBUILD_SHARED_LIBS=OFF -DGGML_NATIVE=OFF -DGGML_OPENMP=OFF \
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
+            -DCMAKE_EXE_LINKER_FLAGS="-static-libstdc++ -static-libgcc" \
+            -DCMAKE_SHARED_LINKER_FLAGS="-static-libstdc++ -static-libgcc"
+          cmake --build build -j "$(nproc)"
+
+      - name: 打包 (Linux)
+        if: matrix.platform == 'linux'
+        run: |
+          name="${{ matrix.pkg }}"
+          bash scripts/package_release.sh build "$name"
+          # 校验打包副本是否自包含，构建树的 rpath 会掩盖缺失的库
+          for f in "build/$name"/breeze-* "build/$name"/libbreeze.so; do
+            ldd "$f"
+            if ldd "$f" | grep -qE "not found|libggml|/build/"; then echo "$f is not self contained"; exit 1; fi
+          done
+          "build/$name/breeze-server" --help
+          tar -C build -czf "$name.tar.gz" "$name"
+
+      # ============ Windows (MSYS2 UCRT64 mingw) ============
+      - name: 安装 MSYS2 工具链 (Windows)
+        if: matrix.platform == 'windows'
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: true
+          install: >-
+            mingw-w64-ucrt-x86_64-gcc
+            mingw-w64-ucrt-x86_64-cmake
+            mingw-w64-ucrt-x86_64-ninja
+            mingw-w64-ucrt-x86_64-ccache
+            mingw-w64-ucrt-x86_64-vulkan-headers
+            mingw-w64-ucrt-x86_64-vulkan-loader
+            mingw-w64-ucrt-x86_64-shaderc
+
+      - name: ccache 缓存 (Windows)
+        if: matrix.platform == 'windows'
+        uses: actions/cache@v4
+        with:
+          path: .ccache
+          key: ccache-windows-${{ github.sha }}
+          restore-keys: ccache-windows-
+
+      - name: 构建 (Windows)
+        if: matrix.platform == 'windows'
+        shell: msys2 {0}
+        run: |
+          export CCACHE_DIR="$GITHUB_WORKSPACE/.ccache"
+          mkdir -p "$CCACHE_DIR"
+          cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \
+            -DBUILD_SHARED_LIBS=OFF -DGGML_NATIVE=OFF -DGGML_OPENMP=OFF \
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+          cmake --build build -j $(nproc)
+
+      - name: 打包 (Windows)
+        if: matrix.platform == 'windows'
+        shell: msys2 {0}
+        run: |
+          name="${{ matrix.pkg }}"
+          bash scripts/package_release.sh build "$name"
+          "./build/$name/breeze-server.exe" --help
+
+      - name: 压缩 (Windows)
+        if: matrix.platform == 'windows'
+        shell: pwsh
+        run: 7z a -tzip "${{ matrix.pkg }}.zip" "build/${{ matrix.pkg }}"
+
+      # ============ 上传构件 ============
+      - name: 上传构件
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.pkg }}
+          path: ${{ matrix.pkg }}.${{ matrix.archive }}
+
+  release:
+    name: 发布 Laster 预发行版
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: 下载构件
+        uses: actions/download-artifact@v4
+        with:
+          path: assets
+          merge-multiple: true
+
+      - name: 创建/覆盖 Laster 预发行版
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -e
+          BUILD_TIME=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
+          SHA_SHORT=${GITHUB_SHA::7}
+          {
+            echo "构建时间：${BUILD_TIME}"
+            echo "提交：${SHA_SHORT}"
+            echo "分支：${GITHUB_REF_NAME}"
+            echo ""
+            echo "每次推送到 main 时自动构建并覆盖；这不是稳定版本，仅供最新尝鲜。"
+          } > NOTES.md
+          # 删除旧的 Laster 发行版与 tag，使 tag 始终指向最新提交（自动覆盖）
+          gh release delete Laster --yes --cleanup-tag 2>/dev/null || true
+          gh release create Laster \
+            --target "$GITHUB_SHA" \
+            --prerelease \
+            --title "Laster（最新）" \
+            --notes-file NOTES.md \
+            assets/*.tar.gz assets/*.zip
