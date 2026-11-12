@@ -141,6 +141,11 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
       - name: 下载构件
         uses: actions/download-artifact@v4
         with:
@@ -161,11 +166,16 @@ jobs:
             echo ""
             echo "每次推送到 main 时自动构建并覆盖；这不是稳定版本，仅供最新尝鲜。"
           } > NOTES.md
-          # 删除旧的 Laster 发行版与 tag，使 tag 始终指向最新提交（自动覆盖）
-          gh release delete Laster --yes --cleanup-tag 2>/dev/null || true
-          gh release create Laster \
-            --target "$GITHUB_SHA" \
-            --prerelease \
-            --title "Laster（最新）" \
-            --notes-file NOTES.md \
-            assets/*.tar.gz assets/*.zip
+          # 用 token 配置远程，强制把 Laster tag 移到当前提交（自动覆盖）
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}"
+          git tag -f Laster "$GITHUB_SHA"
+          git push -f origin refs/tags/Laster
+          # 首次创建；若已存在则更新正文并覆盖资产
+          if gh release create Laster --prerelease --title "Laster（最新）" --notes-file NOTES.md assets/*.tar.gz assets/*.zip 2>/dev/null; then
+            echo "created Laster prerelease"
+          else
+            gh release edit Laster --title "Laster（最新）" --notes-file NOTES.md
+            gh release upload Laster assets/*.tar.gz assets/*.zip --clobber
+          fi
