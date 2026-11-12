@@ -11,6 +11,8 @@ streaming at better than realtime on a mid range GPU.
 <img src="https://img.shields.io/badge/Vulkan-AC162C?style=for-the-badge&logo=vulkan&logoColor=white" alt="Vulkan">
 <a href="https://huggingface.co/HoppouAI/Breeze-TTS-2.cpp"><img src="https://img.shields.io/badge/GGUF_weights-FFD21E?style=for-the-badge&logo=huggingface&logoColor=black" alt="GGUF weights"></a>
 
+English | [简体中文](README.zh-CN.md)
+
 </div>
 
 A C++ / GGUF reimplementation of [BreezeBlue/Breeze-TTS-2](https://huggingface.co/BreezeBlue/Breeze-TTS-2),
@@ -111,6 +113,8 @@ Vulkan stays the default, the reasons and the per stage numbers are in [docs/bui
 <a href="docs/ctypes.md"><img src="https://img.shields.io/badge/Python-2b3137?style=for-the-badge" alt="Python"></a>
 <a href="docs/performance.md"><img src="https://img.shields.io/badge/Performance-2b3137?style=for-the-badge" alt="Performance"></a>
 <a href="docs/architecture.md"><img src="https://img.shields.io/badge/Architecture-2b3137?style=for-the-badge" alt="Architecture"></a>
+<br>
+<a href="docs-zh/README.md"><img src="https://img.shields.io/badge/简体中文文档-9b2c2c?style=for-the-badge" alt="简体中文文档"></a>
 
 </div>
 
