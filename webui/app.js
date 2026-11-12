@@ -7,8 +7,22 @@ const streamToggle = document.getElementById("stream");
 const bufferInput = document.getElementById("buffer");
 const bufferOut = document.getElementById("bufval");
 const stopBtn = document.getElementById("stop");
+const i18n = window.BreezeI18n;
+const t = (key, vars) => i18n.t(key, vars);
 let wsPort = 0;
 let voices = [];
+
+// the status bar is rewritten often, so remember the last key and re-render it on a language switch
+let statusState = { key: "status.idle", vars: null };
+
+function setStatus(key, vars) {
+  statusState = { key: key, vars: vars || null };
+  statusEl.textContent = t(key, vars);
+}
+
+function refreshStatus() {
+  statusEl.textContent = t(statusState.key, statusState.vars);
+}
 
 function syncBuffer() {
   bufferOut.textContent = Number(bufferInput.value).toFixed(2) + "s";
@@ -19,6 +33,7 @@ function syncBuffer() {
 bufferInput.addEventListener("input", syncBuffer);
 streamToggle.addEventListener("change", syncBuffer);
 syncBuffer();
+setStatus("status.idle");
 
 tabs.forEach(tab => {
   tab.addEventListener("click", () => {
@@ -52,6 +67,28 @@ function syncVoice(panel) {
   }
 }
 
+// rebuilt on every language switch, keeping whatever the user had picked
+function fillVoiceSelects() {
+  document.querySelectorAll("select[data-f=voice_id]").forEach(sel => {
+    const keep = sel.value;
+    const none = document.createElement("option");
+    none.value = "";
+    none.textContent = t("option.upload");
+    sel.textContent = "";
+    sel.appendChild(none);
+    for (const v of voices) {
+      const o = document.createElement("option");
+      o.value = v.id;
+      o.textContent = v.id + "  (" + v.seconds.toFixed(1) + "s)" +
+                      (v.saved ? "" : "  " + t("option.temporary"));
+      if (v.description) o.title = v.description;
+      sel.appendChild(o);
+    }
+    sel.value = voices.some(v => v.id === keep) ? keep : "";
+    syncVoice(sel.closest(".panel"));
+  });
+}
+
 async function loadVoices() {
   let list = [];
   try {
@@ -60,36 +97,24 @@ async function loadVoices() {
   } catch (e) { return; }
   voices = list;
   renderLibrary();
-  document.querySelectorAll("select[data-f=voice_id]").forEach(sel => {
-    const keep = sel.value;
-    sel.innerHTML = "<option value=\"\">upload a clip instead</option>";
-    for (const v of list) {
-      const o = document.createElement("option");
-      o.value = v.id;
-      o.textContent = v.id + "  (" + v.seconds.toFixed(1) + "s)" + (v.saved ? "" : "  temporary");
-      if (v.description) o.title = v.description;
-      sel.appendChild(o);
-    }
-    sel.value = list.some(v => v.id === keep) ? keep : "";
-    syncVoice(sel.closest(".panel"));
-  });
+  fillVoiceSelects();
 }
 
 async function saveVoice(panel) {
   const f = fields(panel);
   const name = (f.save_name.value || "").trim();
-  if (!name) { statusEl.textContent = "NAME THE VOICE FIRST"; return; }
+  if (!name) { setStatus("status.nameFirst"); return; }
   if (!/^[A-Za-z0-9_-]+$/.test(name)) {
-    statusEl.textContent = "NAME CAN ONLY USE LETTERS, DIGITS, DASH AND UNDERSCORE";
+    setStatus("status.nameBad");
     return;
   }
   if (!f.ref_audio.files.length || !(f.ref_text.value || "").trim()) {
-    statusEl.textContent = "A CLIP AND ITS TRANSCRIPT ARE REQUIRED TO SAVE A VOICE";
+    setStatus("status.saveNeedClip");
     return;
   }
   const btn = panel.querySelector(".save-voice");
   btn.disabled = true;
-  statusEl.textContent = "SAVING VOICE ...";
+  setStatus("status.savingVoice");
   try {
     const form = new FormData();
     form.append("name", name);
@@ -100,17 +125,17 @@ async function saveVoice(panel) {
     const res = await fetch("/v1/voices", { method: "POST", body: form });
     const body = await res.json();
     if (!res.ok) {
-      statusEl.textContent = res.status === 409 ? "BUSY - ONE REQUEST AT A TIME"
-                                               : "ERROR: " + (body.error || res.status);
+      if (res.status === 409) setStatus("status.busy");
+      else setStatus("status.error", { msg: body.error || res.status });
     } else {
       await loadVoices();
       document.querySelectorAll("select[data-f=voice_id]").forEach(sel => { sel.value = body.id; });
       document.querySelectorAll(".panel").forEach(syncVoice);
-      statusEl.textContent = "SAVED " + body.id + " - " + body.seconds.toFixed(2) + "s";
+      setStatus("status.saved", { id: body.id, secs: body.seconds.toFixed(2) });
       f.save_desc.value = "";
     }
   } catch (e) {
-    statusEl.textContent = "ERROR: " + e.message;
+    setStatus("status.error", { msg: e.message });
   }
   btn.disabled = false;
 }
@@ -250,12 +275,12 @@ async function readBuffered(res, onProgress) {
 async function resolveVoice(f) {
   if (f.voice_id && f.voice_id.value) return f.voice_id.value;
   if (!f.ref_audio || !f.ref_audio.files.length) return "";
-  statusEl.textContent = "ENCODING REFERENCE ...";
+  setStatus("status.encoding");
   const form = new FormData();
   form.append("ref_audio", f.ref_audio.files[0]);
   form.append("ref_text", f.ref_text ? f.ref_text.value || "" : "");
   const r = await fetch("/v1/voices", { method: "POST", body: form });
-  if (!r.ok) throw new Error("could not encode the reference");
+  if (!r.ok) throw new Error(t("status.encodeFailed"));
   return (await r.json()).id;
 }
 
@@ -264,7 +289,7 @@ let liveSocket = null;
 function wsGenerate(panel, tabName) {
   const f = fields(panel);
   const text = (f.text.value || "").trim();
-  if (!text) { statusEl.textContent = "TEXT IS REQUIRED"; return Promise.resolve(); }
+  if (!text) { setStatus("status.textRequired"); return Promise.resolve(); }
 
   const btn = panel.querySelector(".go");
   const lead = Number(bufferInput.value);
@@ -281,7 +306,8 @@ function wsGenerate(panel, tabName) {
     download.classList.remove("ready");
     player.pause();
     player.removeAttribute("src");
-    statusEl.textContent = "CONNECTING ...";
+    player.classList.remove("ready");
+    setStatus("status.connecting");
 
     let sr = 24000;
     let p = null;
@@ -290,6 +316,7 @@ function wsGenerate(panel, tabName) {
       if (pcm.length) {
         const url2 = URL.createObjectURL(makeWav(pcm.buffer, sr));
         player.src = url2;
+        player.classList.add("ready");
         download.href = url2;
         download.classList.add("ready");
       }
@@ -304,9 +331,13 @@ function wsGenerate(panel, tabName) {
       if (ev.data instanceof ArrayBuffer) {
         if (!p) p = makePlayer(sr, streaming ? lead : 1e9);
         p.push(new Uint8Array(ev.data));
-        statusEl.textContent = (streaming ? "STREAMING - " : "GENERATING - ") +
-                               (p.samples / sr).toFixed(2) + "s" +
-                               (p.underruns ? "  (" + p.underruns + " REBUFFER)" : "");
+        const secs = (p.samples / sr).toFixed(2);
+        if (p.underruns) {
+          setStatus(streaming ? "status.streamingRebuffer" : "status.generatingRebuffer",
+                    { secs: secs, n: p.underruns });
+        } else {
+          setStatus(streaming ? "status.streaming" : "status.generating", { secs: secs });
+        }
         return;
       }
       const m = JSON.parse(ev.data);
@@ -322,26 +353,27 @@ function wsGenerate(panel, tabName) {
           seed: Number(f.seed ? f.seed.value : 42)
         }));
         sock.send(JSON.stringify({ type: "end", text }));
-        statusEl.textContent = "GENERATING ...";
+        setStatus("status.generatingShort");
       } else if (m.type === "queued") {
-        statusEl.textContent = "QUEUED, WAITING FOR THE GPU ...";
+        setStatus("status.queued");
       } else if (m.type === "cancelled") {
-        statusEl.textContent = "STOPPED" + (p ? " - " + (p.samples / sr).toFixed(2) + "s" : "");
+        if (p) setStatus("status.stoppedSecs", { secs: (p.samples / sr).toFixed(2) });
+        else setStatus("status.stopped");
         done();
       } else if (m.type === "done") {
         const secs = p ? p.samples / sr : 0;
         done();
-        statusEl.textContent = "DONE - " + secs.toFixed(2) + "s @ " + sr + "Hz";
+        setStatus("status.done", { secs: secs.toFixed(2), sr: sr });
         if (!streaming) player.play().catch(() => {});
       } else if (m.type === "error") {
-        statusEl.textContent = "ERROR: " + (m.message || "unknown");
+        setStatus("status.error", { msg: m.message || t("status.unknown") });
         done();
       }
     };
-    sock.onerror = () => { statusEl.textContent = "WEBSOCKET ERROR"; done(); };
+    sock.onerror = () => { setStatus("status.wsError"); done(); };
     sock.onclose = () => { if (liveSocket === sock) done(); };
   })).catch(e => {
-    statusEl.textContent = "ERROR: " + e.message;
+    setStatus("status.error", { msg: e.message });
     btn.disabled = false;
     stopBtn.classList.remove("live");
   });
@@ -350,7 +382,7 @@ function wsGenerate(panel, tabName) {
 async function generate(panel, tabName) {
   const f = fields(panel);
   const text = (f.text.value || "").trim();
-  if (!text) { statusEl.textContent = "TEXT IS REQUIRED"; return; }
+  if (!text) { setStatus("status.textRequired"); return; }
 
   const form = new FormData();
   form.append("text", text);
@@ -365,15 +397,17 @@ async function generate(panel, tabName) {
   const streaming = streamToggle.checked;
   const btn = panel.querySelector(".go");
   btn.disabled = true;
-  statusEl.textContent = streaming ? "STREAMING ..." : "GENERATING ...";
+  setStatus(streaming ? "status.streamingShort" : "status.generatingShort");
   download.classList.remove("ready");
   player.pause();
   player.removeAttribute("src");
+  player.classList.remove("ready");
 
   try {
     const res = await fetch("/v1/audio/speech", { method: "POST", body: form });
     if (!res.ok) {
-      statusEl.textContent = res.status === 409 ? "BUSY - ONE REQUEST AT A TIME" : "ERROR " + res.status;
+      if (res.status === 409) setStatus("status.busy");
+      else setStatus("status.errorCode", { code: res.status });
       btn.disabled = false;
       return;
     }
@@ -382,19 +416,22 @@ async function generate(panel, tabName) {
     const pcm = streaming
       ? await readStreaming(res, sr, Number(bufferInput.value),
                             (s, under) => {
-                              statusEl.textContent = "STREAMING - " + s.toFixed(2) + "s"
-                                + (under ? "  (" + under + " REBUFFER" + (under > 1 ? "S" : "") + ")" : "");
+                              if (under) setStatus("status.streamingRebuffer", { secs: s.toFixed(2), n: under });
+                              else setStatus("status.streaming", { secs: s.toFixed(2) });
                             })
-      : await readBuffered(res, b => { statusEl.textContent = "GENERATING - " + (b / 2 / sr).toFixed(2) + "s"; });
+      : await readBuffered(res, b => {
+          setStatus("status.generating", { secs: (b / 2 / sr).toFixed(2) });
+        });
 
     const url = URL.createObjectURL(makeWav(pcm.buffer, sr));
     player.src = url;
+    player.classList.add("ready");
     download.href = url;
     download.classList.add("ready");
-    statusEl.textContent = "DONE - " + (pcm.length / 2 / sr).toFixed(2) + "s @ " + sr + "Hz";
+    setStatus("status.done", { secs: (pcm.length / 2 / sr).toFixed(2), sr: sr });
     if (!streaming) player.play().catch(() => {});
   } catch (e) {
-    statusEl.textContent = "ERROR: " + e.message;
+    setStatus("status.error", { msg: e.message });
   }
   btn.disabled = false;
 }
@@ -403,15 +440,15 @@ async function convert(panel) {
   const f = fields(panel);
   const voice = f.voice_id ? f.voice_id.value : "";
   if (!f.source.files.length) {
-    statusEl.textContent = "A SOURCE WAV IS REQUIRED";
+    setStatus("status.sourceRequired");
     return;
   }
   if (!voice && !f.ref_audio.files.length) {
-    statusEl.textContent = "PICK A SAVED VOICE OR UPLOAD A TARGET VOICE WAV";
+    setStatus("status.targetRequired");
     return;
   }
   if (!voice && !(f.ref_text.value || "").trim()) {
-    statusEl.textContent = "TARGET VOICE TRANSCRIPT IS REQUIRED";
+    setStatus("status.targetTextRequired");
     return;
   }
   const form = new FormData();
@@ -427,30 +464,33 @@ async function convert(panel) {
 
   const btn = panel.querySelector(".go");
   btn.disabled = true;
-  statusEl.textContent = "CONVERTING ...";
+  setStatus("status.converting");
   download.classList.remove("ready");
   player.pause();
   player.removeAttribute("src");
+  player.classList.remove("ready");
 
   try {
     const res = await fetch("/v1/audio/convert", { method: "POST", body: form });
     if (!res.ok) {
-      statusEl.textContent = res.status === 409 ? "BUSY - ONE REQUEST AT A TIME" : "ERROR " + res.status;
+      if (res.status === 409) setStatus("status.busy");
+      else setStatus("status.errorCode", { code: res.status });
       btn.disabled = false;
       return;
     }
     const sr = parseInt(res.headers.get("X-Sample-Rate") || "24000", 10);
     const pcm = await readBuffered(res, b => {
-      statusEl.textContent = "RECEIVING - " + (b / 2 / sr).toFixed(2) + "s";
+      setStatus("status.receiving", { secs: (b / 2 / sr).toFixed(2) });
     });
     const url = URL.createObjectURL(makeWav(pcm.buffer, sr));
     player.src = url;
+    player.classList.add("ready");
     download.href = url;
     download.classList.add("ready");
-    statusEl.textContent = "DONE - " + (pcm.length / 2 / sr).toFixed(2) + "s @ " + sr + "Hz";
+    setStatus("status.done", { secs: (pcm.length / 2 / sr).toFixed(2), sr: sr });
     player.play().catch(() => {});
   } catch (e) {
-    statusEl.textContent = "ERROR: " + e.message;
+    setStatus("status.error", { msg: e.message });
   }
   btn.disabled = false;
 }
@@ -504,14 +544,14 @@ function fieldRow(box, key, value, onChange) {
   const row = el("div", "vfield");
   const k = el("input");
   k.type = "text";
-  k.placeholder = "field";
+  k.placeholder = t("ph.metaKey");
   k.value = key;
   const val = el("input");
   val.type = "text";
-  val.placeholder = "value";
+  val.placeholder = t("ph.metaValue");
   val.value = value;
   const del = el("button", "ghost", "X");
-  del.title = "remove field";
+  del.title = t("lib.removeField");
   del.addEventListener("click", () => { row.remove(); onChange(); });
   k.addEventListener("input", onChange);
   val.addEventListener("input", onChange);
@@ -524,32 +564,32 @@ function voiceCard(v) {
   const card = el("div", "vcard");
   const head = el("div", "vhead");
   head.append(el("span", "vname", v.id), el("span", "vtag", v.seconds.toFixed(1) + "s"),
-              el("span", "vtag" + (v.saved ? "" : " temp"), v.saved ? "SAVED" : "TEMPORARY"));
-  const use = el("button", "ghost", "USE");
-  use.title = "pick this voice in the clone tab";
+              el("span", "vtag" + (v.saved ? "" : " temp"), t(v.saved ? "lib.saved" : "lib.temporary")));
+  const use = el("button", "ghost", t("btn.use"));
+  use.title = t("lib.useTitle");
   use.addEventListener("click", () => useVoice(v.id));
   head.appendChild(use);
   card.appendChild(head);
   if (v.ref_text) card.appendChild(el("p", "vtext", "\u201c" + v.ref_text + "\u201d"));
 
-  const label = el("label", "", "DESCRIPTION");
+  const label = el("label", "", t("field.description"));
   const desc = el("textarea");
   desc.rows = 2;
   desc.maxLength = 4096;
-  desc.placeholder = "what this voice sounds like, where it came from, what it is good for";
+  desc.placeholder = t("ph.voiceDescCard");
   desc.value = v.description || "";
   label.appendChild(desc);
   card.appendChild(label);
 
-  const fieldsLabel = el("label", "", "EXTRA FIELDS");
+  const fieldsLabel = el("label", "", t("field.extra"));
   card.appendChild(fieldsLabel);
   const box = el("div", "vfields");
   card.appendChild(box);
 
   const actions = el("div", "vactions");
-  const add = el("button", "ghost", "+ FIELD");
-  const save = el("button", "go", "SAVE CHANGES");
-  const status = el("span", "vstatus", v.saved ? "" : "temporary voices lose their notes when the server restarts");
+  const add = el("button", "ghost", t("btn.addField"));
+  const save = el("button", "go", t("btn.saveChanges"));
+  const status = el("span", "vstatus", v.saved ? "" : t("lib.tempNote"));
   actions.append(add, save, status);
   card.appendChild(actions);
 
@@ -560,21 +600,24 @@ function voiceCard(v) {
       const [k, val] = row.querySelectorAll("input");
       const key = k.value.trim();
       if (!key && !val.value.trim()) return;
-      if (!META_KEY.test(key) || key === "description") bad = bad || key || "(empty)";
+      if (!META_KEY.test(key) || key === "description") bad = bad || key || t("lib.emptyKey");
       else meta[key] = val.value;
     });
     return { description: desc.value, meta, bad };
   };
+  let dirtyState = false;
   const dirty = () => {
     const c = current();
     const before = v.metadata || {};
     const same = c.description === (v.description || "") &&
                  Object.keys(c.meta).length === Object.keys(before).length &&
                  Object.keys(c.meta).every(k => before[k] === c.meta[k]);
+    const wasDirty = dirtyState;
+    dirtyState = !same;
     card.classList.toggle("dirty", !same);
     save.disabled = same;
-    if (!same) { status.classList.remove("err"); status.textContent = "unsaved changes"; }
-    else if (status.textContent === "unsaved changes") status.textContent = "";
+    if (!same) { status.classList.remove("err"); status.textContent = t("lib.unsaved"); }
+    else if (wasDirty) status.textContent = "";
   };
 
   for (const [k, val] of Object.entries(v.metadata || {})) fieldRow(box, k, val, dirty);
@@ -591,14 +634,14 @@ function voiceCard(v) {
     const c = current();
     if (c.bad) {
       status.classList.add("err");
-      status.textContent = "field names are letters, digits, dot, dash or underscore: " + c.bad;
+      status.textContent = t("lib.badField", { name: c.bad });
       return;
     }
     const metadata = Object.assign({}, c.meta);
     for (const k of Object.keys(v.metadata || {})) if (!(k in metadata)) metadata[k] = null;
     save.disabled = true;
     status.classList.remove("err");
-    status.textContent = "saving ...";
+    status.textContent = t("lib.saving");
     try {
       const res = await fetch("/v1/voices/" + encodeURIComponent(v.id), {
         method: "PATCH",
@@ -609,14 +652,14 @@ function voiceCard(v) {
       if (!res.ok) throw new Error(body.error || res.status);
       Object.assign(v, body);
       dirty();
-      status.textContent = v.saved ? "saved" : "updated until the server restarts";
+      status.textContent = t(v.saved ? "lib.savedOk" : "lib.savedTemp");
       document.querySelectorAll(".panel").forEach(syncVoice);
       document.querySelectorAll("select[data-f=voice_id] option").forEach(o => {
         if (o.value === v.id) o.title = v.description || "";
       });
     } catch (e) {
       status.classList.add("err");
-      status.textContent = "error: " + e.message;
+      status.textContent = t("lib.error", { msg: e.message });
       save.disabled = false;
     }
   });
@@ -638,8 +681,9 @@ function renderLibrary() {
     shown++;
   }
   libCount.textContent = !voices.length
-    ? "no voices yet, save one from the clone, direction or changer tab"
-    : shown === voices.length ? voices.length + " voices" : shown + " of " + voices.length + " voices";
+    ? t("lib.none")
+    : shown === voices.length ? t("lib.all", { n: voices.length })
+                              : t("lib.some", { shown: shown, total: voices.length });
 }
 
 libFilter.addEventListener("input", renderLibrary);
@@ -652,5 +696,12 @@ async function loadHealth() {
   } catch (e) { wsPort = 0; }
 }
 
+i18n.onChange(() => {
+  refreshStatus();
+  fillVoiceSelects();
+  renderLibrary();
+});
+
+fillVoiceSelects();
 loadHealth();
 loadVoices();

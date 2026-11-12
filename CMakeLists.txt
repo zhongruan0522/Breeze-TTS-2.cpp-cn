@@ -119,6 +119,7 @@ add_custom_command(
     DEPENDS
         ${CMAKE_CURRENT_SOURCE_DIR}/webui/index.html
         ${CMAKE_CURRENT_SOURCE_DIR}/webui/style.css
+        ${CMAKE_CURRENT_SOURCE_DIR}/webui/i18n.js
         ${CMAKE_CURRENT_SOURCE_DIR}/webui/app.js
         ${CMAKE_CURRENT_SOURCE_DIR}/webui/talk.html
         ${CMAKE_CURRENT_SOURCE_DIR}/webui/talk.css

@@ -434,6 +434,9 @@ int run_server(const ServerOptions & opts) {
         svr.Get("/style.css", [](const httplib::Request &, httplib::Response & res) {
             res.set_content(breeze_webui::style_css, "text/css");
         });
+        svr.Get("/i18n.js", [](const httplib::Request &, httplib::Response & res) {
+            res.set_content(breeze_webui::i18n_js, "application/javascript");
+        });
         svr.Get("/app.js", [](const httplib::Request &, httplib::Response & res) {
             res.set_content(breeze_webui::app_js, "application/javascript");
         });
