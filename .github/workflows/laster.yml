@@ -94,6 +94,8 @@ jobs:
             mingw-w64-ucrt-x86_64-vulkan-headers
             mingw-w64-ucrt-x86_64-vulkan-loader
             mingw-w64-ucrt-x86_64-shaderc
+            mingw-w64-ucrt-x86_64-spirv-headers
+            mingw-w64-ucrt-x86_64-spirv-tools
 
       - name: ccache 缓存 (Windows)
         if: matrix.platform == 'windows'
