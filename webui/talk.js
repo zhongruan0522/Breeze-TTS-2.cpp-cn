@@ -735,7 +735,7 @@ class Call {
       const reader = res.body.getReader();
       const dec = new TextDecoder();
       let carry = '';
-      for (;;) {
+      for (; ;) {
         const { value, done } = await reader.read();
         if (done) break;
         carry += dec.decode(value, { stream: true });
@@ -1007,7 +1007,7 @@ class Call {
     this.stopPlayback();
     if (this.stream) for (const t of this.stream.getTracks()) t.stop();
     if (this.ctx) this.ctx.close();
-    if (this.anchorVoice) fetch('/v1/voices/' + encodeURIComponent(this.anchorVoice), { method: 'DELETE', keepalive: true }).catch(() => {});
+    if (this.anchorVoice) fetch('/v1/voices/' + encodeURIComponent(this.anchorVoice), { method: 'DELETE', keepalive: true }).catch(() => { });
   }
 }
 

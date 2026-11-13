@@ -80,7 +80,7 @@ function fillVoiceSelects() {
       const o = document.createElement("option");
       o.value = v.id;
       o.textContent = v.id + "  (" + v.seconds.toFixed(1) + "s)" +
-                      (v.saved ? "" : "  " + t("option.temporary"));
+        (v.saved ? "" : "  " + t("option.temporary"));
       if (v.description) o.title = v.description;
       sel.appendChild(o);
     }
@@ -167,13 +167,13 @@ let audioCtx = null;
 
 function openContext(sampleRate) {
   const Ctor = window.AudioContext || window.webkitAudioContext;
-  if (audioCtx) audioCtx.close().catch(() => {});
+  if (audioCtx) audioCtx.close().catch(() => { });
   try {
     audioCtx = new Ctor({ sampleRate });
   } catch (e) {
     audioCtx = new Ctor();
   }
-  audioCtx.resume().catch(() => {});
+  audioCtx.resume().catch(() => { });
   return audioCtx;
 }
 
@@ -238,7 +238,7 @@ function makePlayer(sr, lead) {
       queued = null;
       return join(parts);
     },
-    stop() { try { ac.close(); } catch (e) {} return join(parts); },
+    stop() { try { ac.close(); } catch (e) { } return join(parts); },
     get samples() { return samples; },
     get underruns() { return underruns; }
   };
@@ -247,7 +247,7 @@ function makePlayer(sr, lead) {
 async function readStreaming(res, sr, lead, onProgress) {
   const p = makePlayer(sr, lead);
   const reader = res.body.getReader();
-  for (;;) {
+  for (; ;) {
     const { done, value } = await reader.read();
     if (done) break;
     p.push(value);
@@ -260,7 +260,7 @@ async function readBuffered(res, onProgress) {
   const reader = res.body.getReader();
   const parts = [];
   let bytes = 0;
-  for (;;) {
+  for (; ;) {
     const { done, value } = await reader.read();
     if (done) break;
     parts.push(value);
@@ -297,7 +297,7 @@ function wsGenerate(panel, tabName) {
 
   return resolveVoice(f).then(voice => new Promise(resolve => {
     const url = (location.protocol === "https:" ? "wss://" : "ws://") +
-                location.hostname + ":" + wsPort;
+      location.hostname + ":" + wsPort;
     const sock = new WebSocket(url);
     sock.binaryType = "arraybuffer";
     liveSocket = sock;
@@ -323,7 +323,7 @@ function wsGenerate(panel, tabName) {
       btn.disabled = false;
       stopBtn.classList.remove("live");
       liveSocket = null;
-      try { sock.close(); } catch (e) {}
+      try { sock.close(); } catch (e) { }
       resolve(pcm);
     };
 
@@ -334,7 +334,7 @@ function wsGenerate(panel, tabName) {
         const secs = (p.samples / sr).toFixed(2);
         if (p.underruns) {
           setStatus(streaming ? "status.streamingRebuffer" : "status.generatingRebuffer",
-                    { secs: secs, n: p.underruns });
+            { secs: secs, n: p.underruns });
         } else {
           setStatus(streaming ? "status.streaming" : "status.generating", { secs: secs });
         }
@@ -347,7 +347,7 @@ function wsGenerate(panel, tabName) {
           type: "start",
           voice_id: voice,
           instruction: f.instruction ? (f.instruction.value || "Speak clearly and naturally.")
-                                     : "Speak clearly and naturally.",
+            : "Speak clearly and naturally.",
           ref_text: f.ref_text ? f.ref_text.value || "" : "",
           cfg_scale: Number(f.cfg ? f.cfg.value : 1),
           seed: Number(f.seed ? f.seed.value : 42)
@@ -364,7 +364,7 @@ function wsGenerate(panel, tabName) {
         const secs = p ? p.samples / sr : 0;
         done();
         setStatus("status.done", { secs: secs.toFixed(2), sr: sr });
-        if (!streaming) player.play().catch(() => {});
+        if (!streaming) player.play().catch(() => { });
       } else if (m.type === "error") {
         setStatus("status.error", { msg: m.message || t("status.unknown") });
         done();
@@ -389,7 +389,7 @@ async function generate(panel, tabName) {
   form.append("seed", f.seed ? f.seed.value : "42");
   form.append("cfg_scale", f.cfg ? f.cfg.value : "1.0");
   form.append("instruction", f.instruction ? (f.instruction.value || "Speak clearly and naturally.")
-                                           : "Speak clearly and naturally.");
+    : "Speak clearly and naturally.");
   if (f.ref_text) form.append("ref_text", f.ref_text.value || "");
   if (f.voice_id && f.voice_id.value) form.append("voice_id", f.voice_id.value);
   else if (f.ref_audio && f.ref_audio.files.length) form.append("ref_audio", f.ref_audio.files[0]);
@@ -415,13 +415,13 @@ async function generate(panel, tabName) {
 
     const pcm = streaming
       ? await readStreaming(res, sr, Number(bufferInput.value),
-                            (s, under) => {
-                              if (under) setStatus("status.streamingRebuffer", { secs: s.toFixed(2), n: under });
-                              else setStatus("status.streaming", { secs: s.toFixed(2) });
-                            })
+        (s, under) => {
+          if (under) setStatus("status.streamingRebuffer", { secs: s.toFixed(2), n: under });
+          else setStatus("status.streaming", { secs: s.toFixed(2) });
+        })
       : await readBuffered(res, b => {
-          setStatus("status.generating", { secs: (b / 2 / sr).toFixed(2) });
-        });
+        setStatus("status.generating", { secs: (b / 2 / sr).toFixed(2) });
+      });
 
     const url = URL.createObjectURL(makeWav(pcm.buffer, sr));
     player.src = url;
@@ -429,7 +429,7 @@ async function generate(panel, tabName) {
     download.href = url;
     download.classList.add("ready");
     setStatus("status.done", { secs: (pcm.length / 2 / sr).toFixed(2), sr: sr });
-    if (!streaming) player.play().catch(() => {});
+    if (!streaming) player.play().catch(() => { });
   } catch (e) {
     setStatus("status.error", { msg: e.message });
   }
@@ -488,7 +488,7 @@ async function convert(panel) {
     download.href = url;
     download.classList.add("ready");
     setStatus("status.done", { secs: (pcm.length / 2 / sr).toFixed(2), sr: sr });
-    player.play().catch(() => {});
+    player.play().catch(() => { });
   } catch (e) {
     setStatus("status.error", { msg: e.message });
   }
@@ -564,7 +564,7 @@ function voiceCard(v) {
   const card = el("div", "vcard");
   const head = el("div", "vhead");
   head.append(el("span", "vname", v.id), el("span", "vtag", v.seconds.toFixed(1) + "s"),
-              el("span", "vtag" + (v.saved ? "" : " temp"), t(v.saved ? "lib.saved" : "lib.temporary")));
+    el("span", "vtag" + (v.saved ? "" : " temp"), t(v.saved ? "lib.saved" : "lib.temporary")));
   const use = el("button", "ghost", t("btn.use"));
   use.title = t("lib.useTitle");
   use.addEventListener("click", () => useVoice(v.id));
@@ -610,8 +610,8 @@ function voiceCard(v) {
     const c = current();
     const before = v.metadata || {};
     const same = c.description === (v.description || "") &&
-                 Object.keys(c.meta).length === Object.keys(before).length &&
-                 Object.keys(c.meta).every(k => before[k] === c.meta[k]);
+      Object.keys(c.meta).length === Object.keys(before).length &&
+      Object.keys(c.meta).every(k => before[k] === c.meta[k]);
     const wasDirty = dirtyState;
     dirtyState = !same;
     card.classList.toggle("dirty", !same);
@@ -683,7 +683,7 @@ function renderLibrary() {
   libCount.textContent = !voices.length
     ? t("lib.none")
     : shown === voices.length ? t("lib.all", { n: voices.length })
-                              : t("lib.some", { shown: shown, total: voices.length });
+      : t("lib.some", { shown: shown, total: voices.length });
 }
 
 libFilter.addEventListener("input", renderLibrary);

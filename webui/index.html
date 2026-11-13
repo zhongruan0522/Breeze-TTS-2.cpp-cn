@@ -1,189 +1,218 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title data-i18n="app.title">Breeze-TTS-2 · WebUI</title>
-<link rel="stylesheet" href="/style.css" />
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title data-i18n="app.title">Breeze-TTS-2 · WebUI</title>
+  <link rel="stylesheet" href="/style.css" />
 </head>
+
 <body>
-<header>
-  <div class="head-top">
-    <h1>BREEZE-TTS-2.CPP</h1>
-    <div class="lang" role="group" data-i18n-aria="lang.label" aria-label="Language">
-      <button type="button" data-lang="en" aria-pressed="true">EN</button>
-      <button type="button" data-lang="zh" aria-pressed="false">中文</button>
-    </div>
-  </div>
-  <p class="sub" data-i18n="header.sub">open-weight bilingual text to speech, running on ggml. voice design, cloning, direction, conversion.</p>
-</header>
-
-<nav class="tabs">
-  <button class="tab active" data-tab="design" data-i18n="tab.design">VOICE DESIGN</button>
-  <button class="tab" data-tab="clone" data-i18n="tab.clone">VOICE CLONE</button>
-  <button class="tab" data-tab="direction" data-i18n="tab.direction">VOICE DIRECTION</button>
-  <button class="tab" data-tab="changer" data-i18n="tab.changer">VOICE CHANGER</button>
-  <button class="tab" data-tab="library" data-i18n="tab.library">VOICE LIBRARY</button>
-</nav>
-
-<main>
-  <section class="panel active" id="design">
-    <label><span data-i18n="field.text">TEXT TO SPEAK</span>
-      <textarea data-f="text" rows="3" data-i18n-placeholder="ph.text.design" placeholder="Welcome aboard. Your journey begins now."></textarea>
-    </label>
-    <label><span data-i18n="field.voiceDesc">VOICE DESCRIPTION</span>
-      <textarea data-f="instruction" rows="2" data-i18n-placeholder="ph.desc.design" placeholder="A warm, thoughtful young woman with a clear, calm delivery."></textarea>
-    </label>
-    <div class="row">
-      <label><span data-i18n="field.cfg">CFG SCALE</span>
-        <input data-f="cfg" type="number" value="1" min="1" max="10" step="0.5" />
-      </label>
-      <label><span data-i18n="field.seed">SEED</span>
-        <input data-f="seed" type="number" value="42" />
-      </label>
-    </div>
-    <button class="go" data-i18n="btn.generate">GENERATE</button>
-  </section>
-
-  <section class="panel" id="clone">
-    <label><span data-i18n="field.text">TEXT TO SPEAK</span>
-      <textarea data-f="text" rows="3" data-i18n-placeholder="ph.text.clone" placeholder="It is good to hear your voice again after all this time."></textarea>
-    </label>
-    <label><span data-i18n="field.savedVoice">SAVED VOICE</span>
-      <select data-f="voice_id"><option value="" data-i18n="option.upload">upload a clip instead</option></select>
-    </label>
-    <p class="voice-desc"></p>
-    <div class="refblock">
-      <label><span data-i18n="field.refAudio">REFERENCE AUDIO (WAV)</span>
-        <input data-f="ref_audio" type="file" accept="audio/*" />
-      </label>
-      <label><span data-i18n="field.refText">REFERENCE TRANSCRIPT (EXACT)</span>
-        <textarea data-f="ref_text" rows="2" data-i18n-placeholder="ph.refText" placeholder="This is the exact transcript of the reference audio."></textarea>
-      </label>
-      <label><span data-i18n="field.descOptional">DESCRIPTION (OPTIONAL, SAVED WITH THE VOICE)</span>
-        <textarea data-f="save_desc" rows="2" data-i18n-placeholder="ph.saveDesc" placeholder="Gravelly older narrator, slow and warm. Good for audiobooks."></textarea>
-      </label>
-      <div class="row saverow">
-        <label><span data-i18n="field.saveAs">SAVE AS</span>
-          <input data-f="save_name" type="text" data-i18n-placeholder="ph.saveName" placeholder="my_voice" />
-        </label>
-        <button class="save-voice" data-i18n="btn.saveVoice">SAVE VOICE</button>
+  <header>
+    <div class="head-top">
+      <h1>BREEZE-TTS-2.CPP</h1>
+      <div class="lang" role="group" data-i18n-aria="lang.label" aria-label="Language">
+        <button type="button" data-lang="en" aria-pressed="true">EN</button>
+        <button type="button" data-lang="zh" aria-pressed="false">中文</button>
       </div>
     </div>
-    <div class="row">
-      <label><span data-i18n="field.seed">SEED</span>
-        <input data-f="seed" type="number" value="42" />
-      </label>
-    </div>
-    <button class="go" data-i18n="btn.generate">GENERATE</button>
-  </section>
+    <p class="sub" data-i18n="header.sub">open-weight bilingual text to speech, running on ggml. voice design, cloning,
+      direction, conversion.</p>
+  </header>
 
-  <section class="panel" id="direction">
-    <label><span data-i18n="field.text">TEXT TO SPEAK</span>
-      <textarea data-f="text" rows="3" data-i18n-placeholder="ph.text.direction" placeholder="We need to discuss what happened last night."></textarea>
-    </label>
-    <label><span data-i18n="field.direction">DIRECTION</span>
-      <textarea data-f="instruction" rows="2" data-i18n-placeholder="ph.direction" placeholder="Speak slowly with a restrained, serious tone."></textarea>
-    </label>
-    <label><span data-i18n="field.savedVoice">SAVED VOICE</span>
-      <select data-f="voice_id"><option value="" data-i18n="option.upload">upload a clip instead</option></select>
-    </label>
-    <p class="voice-desc"></p>
-    <div class="refblock">
-      <label><span data-i18n="field.refAudio">REFERENCE AUDIO (WAV)</span>
-        <input data-f="ref_audio" type="file" accept="audio/*" />
+  <nav class="tabs">
+    <button class="tab active" data-tab="design" data-i18n="tab.design">VOICE DESIGN</button>
+    <button class="tab" data-tab="clone" data-i18n="tab.clone">VOICE CLONE</button>
+    <button class="tab" data-tab="direction" data-i18n="tab.direction">VOICE DIRECTION</button>
+    <button class="tab" data-tab="changer" data-i18n="tab.changer">VOICE CHANGER</button>
+    <button class="tab" data-tab="library" data-i18n="tab.library">VOICE LIBRARY</button>
+  </nav>
+
+  <main>
+    <section class="panel active" id="design">
+      <label><span data-i18n="field.text">TEXT TO SPEAK</span>
+        <textarea data-f="text" rows="3" data-i18n-placeholder="ph.text.design"
+          placeholder="Welcome aboard. Your journey begins now."></textarea>
       </label>
-      <label><span data-i18n="field.refText">REFERENCE TRANSCRIPT (EXACT)</span>
-        <textarea data-f="ref_text" rows="2" data-i18n-placeholder="ph.refText" placeholder="This is the exact transcript of the reference audio."></textarea>
+      <label><span data-i18n="field.voiceDesc">VOICE DESCRIPTION</span>
+        <textarea data-f="instruction" rows="2" data-i18n-placeholder="ph.desc.design"
+          placeholder="A warm, thoughtful young woman with a clear, calm delivery."></textarea>
       </label>
-      <label><span data-i18n="field.descOptional">DESCRIPTION (OPTIONAL, SAVED WITH THE VOICE)</span>
-        <textarea data-f="save_desc" rows="2" data-i18n-placeholder="ph.saveDesc" placeholder="Gravelly older narrator, slow and warm. Good for audiobooks."></textarea>
-      </label>
-      <div class="row saverow">
-        <label><span data-i18n="field.saveAs">SAVE AS</span>
-          <input data-f="save_name" type="text" data-i18n-placeholder="ph.saveName" placeholder="my_voice" />
+      <div class="row">
+        <label><span data-i18n="field.cfg">CFG SCALE</span>
+          <input data-f="cfg" type="number" value="1" min="1" max="10" step="0.5" />
         </label>
-        <button class="save-voice" data-i18n="btn.saveVoice">SAVE VOICE</button>
-      </div>
-    </div>
-    <div class="row">
-      <label><span data-i18n="field.cfg">CFG SCALE</span>
-        <input data-f="cfg" type="number" value="1" min="1" max="10" step="0.5" />
-      </label>
-      <label><span data-i18n="field.seed">SEED</span>
-        <input data-f="seed" type="number" value="42" />
-      </label>
-    </div>
-    <button class="go" data-i18n="btn.generate">GENERATE</button>
-  </section>
-
-  <section class="panel" id="changer">
-    <p class="note" data-i18n="note.changer">respeaks an existing recording in another voice, keeping its words and timing. no text needed. pitch normally comes from the target voice, so raise KEEP MELODY if the source is sung or strongly intonated.</p>
-    <label><span data-i18n="field.sourceAudio">SOURCE AUDIO (WAV)</span>
-      <input data-f="source" type="file" accept="audio/*" />
-    </label>
-    <label><span data-i18n="field.savedVoice">SAVED VOICE</span>
-      <select data-f="voice_id"><option value="" data-i18n="option.upload">upload a clip instead</option></select>
-    </label>
-    <p class="voice-desc"></p>
-    <div class="refblock">
-      <label><span data-i18n="field.targetVoice">TARGET VOICE (WAV)</span>
-        <input data-f="ref_audio" type="file" accept="audio/*" />
-      </label>
-      <label><span data-i18n="field.targetRefText">TARGET VOICE TRANSCRIPT (EXACT)</span>
-        <textarea data-f="ref_text" rows="2" data-i18n-placeholder="ph.targetRefText" placeholder="This is the exact transcript of the target voice clip."></textarea>
-      </label>
-      <label><span data-i18n="field.descOptional">DESCRIPTION (OPTIONAL, SAVED WITH THE VOICE)</span>
-        <textarea data-f="save_desc" rows="2" data-i18n-placeholder="ph.saveDesc" placeholder="Gravelly older narrator, slow and warm. Good for audiobooks."></textarea>
-      </label>
-      <div class="row saverow">
-        <label><span data-i18n="field.saveAs">SAVE AS</span>
-          <input data-f="save_name" type="text" data-i18n-placeholder="ph.saveName" placeholder="my_voice" />
+        <label><span data-i18n="field.seed">SEED</span>
+          <input data-f="seed" type="number" value="42" />
         </label>
-        <button class="save-voice" data-i18n="btn.saveVoice">SAVE VOICE</button>
       </div>
-    </div>
-    <label><span data-i18n="field.sourceText">SOURCE TRANSCRIPT (OPTIONAL, SHARPENS THE WORDS)</span>
-      <textarea data-f="text" rows="2" data-i18n-placeholder="ph.sourceText" placeholder="Leave empty unless you have the exact words of the source."></textarea>
-    </label>
-    <div class="row">
-      <label><span data-i18n="field.keepMelody">KEEP MELODY</span>
-        <input data-f="keep_acoustic" type="number" value="0" min="0" max="6" step="1" />
-      </label>
-      <label><span data-i18n="field.seed">SEED</span>
-        <input data-f="seed" type="number" value="42" />
-      </label>
-    </div>
-    <button class="go" data-i18n="btn.convert">CONVERT</button>
-  </section>
+      <button class="go" data-i18n="btn.generate">GENERATE</button>
+    </section>
 
-  <section class="panel" id="library">
-    <div class="row libbar">
-      <label class="grow"><span data-i18n="field.filter">FILTER</span>
-        <input id="libfilter" type="text" data-i18n-placeholder="ph.filter" placeholder="name, description, transcript or field" />
+    <section class="panel" id="clone">
+      <label><span data-i18n="field.text">TEXT TO SPEAK</span>
+        <textarea data-f="text" rows="3" data-i18n-placeholder="ph.text.clone"
+          placeholder="It is good to hear your voice again after all this time."></textarea>
       </label>
-      <button id="librefresh" class="ghost" data-i18n="btn.refresh">REFRESH</button>
-    </div>
-    <p class="note" id="libcount"></p>
-    <div id="liblist"></div>
-  </section>
-
-  <section class="output">
-    <div class="row">
-      <label class="toggle"><input id="stream" type="checkbox" checked /> <span data-i18n="output.stream">STREAM WHILE GENERATING</span></label>
-      <label class="slider"><span class="slider-label"><span data-i18n="output.buffer">BUFFER</span> <output id="bufval">1.25s</output></span>
-        <input id="buffer" type="range" min="0" max="4" step="0.25" value="1.25" />
+      <label><span data-i18n="field.savedVoice">SAVED VOICE</span>
+        <select data-f="voice_id">
+          <option value="" data-i18n="option.upload">upload a clip instead</option>
+        </select>
       </label>
-    </div>
-    <div class="status" id="status" role="status" aria-live="polite"></div>
-    <button id="stop" class="stop" data-i18n="btn.stop">STOP</button>
-    <audio id="player" controls></audio>
-    <a id="download" class="dl" download="breeze.wav" data-i18n="btn.download">DOWNLOAD WAV</a>
-  </section>
-</main>
+      <p class="voice-desc"></p>
+      <div class="refblock">
+        <label><span data-i18n="field.refAudio">REFERENCE AUDIO (WAV)</span>
+          <input data-f="ref_audio" type="file" accept="audio/*" />
+        </label>
+        <label><span data-i18n="field.refText">REFERENCE TRANSCRIPT (EXACT)</span>
+          <textarea data-f="ref_text" rows="2" data-i18n-placeholder="ph.refText"
+            placeholder="This is the exact transcript of the reference audio."></textarea>
+        </label>
+        <label><span data-i18n="field.descOptional">DESCRIPTION (OPTIONAL, SAVED WITH THE VOICE)</span>
+          <textarea data-f="save_desc" rows="2" data-i18n-placeholder="ph.saveDesc"
+            placeholder="Gravelly older narrator, slow and warm. Good for audiobooks."></textarea>
+        </label>
+        <div class="row saverow">
+          <label><span data-i18n="field.saveAs">SAVE AS</span>
+            <input data-f="save_name" type="text" data-i18n-placeholder="ph.saveName" placeholder="my_voice" />
+          </label>
+          <button class="save-voice" data-i18n="btn.saveVoice">SAVE VOICE</button>
+        </div>
+      </div>
+      <div class="row">
+        <label><span data-i18n="field.seed">SEED</span>
+          <input data-f="seed" type="number" value="42" />
+        </label>
+      </div>
+      <button class="go" data-i18n="btn.generate">GENERATE</button>
+    </section>
 
-<footer data-i18n="footer.hint">vocal events go inline in parentheses, (laugh) (sigh) (gasp) (yawn) (whispers), or square brackets in chinese, [笑] [叹气]. the tag is plain text so other ones often work too, reroll the seed if it gets read out loud instead</footer>
-<script src="/i18n.js"></script>
-<script src="/app.js"></script>
+    <section class="panel" id="direction">
+      <label><span data-i18n="field.text">TEXT TO SPEAK</span>
+        <textarea data-f="text" rows="3" data-i18n-placeholder="ph.text.direction"
+          placeholder="We need to discuss what happened last night."></textarea>
+      </label>
+      <label><span data-i18n="field.direction">DIRECTION</span>
+        <textarea data-f="instruction" rows="2" data-i18n-placeholder="ph.direction"
+          placeholder="Speak slowly with a restrained, serious tone."></textarea>
+      </label>
+      <label><span data-i18n="field.savedVoice">SAVED VOICE</span>
+        <select data-f="voice_id">
+          <option value="" data-i18n="option.upload">upload a clip instead</option>
+        </select>
+      </label>
+      <p class="voice-desc"></p>
+      <div class="refblock">
+        <label><span data-i18n="field.refAudio">REFERENCE AUDIO (WAV)</span>
+          <input data-f="ref_audio" type="file" accept="audio/*" />
+        </label>
+        <label><span data-i18n="field.refText">REFERENCE TRANSCRIPT (EXACT)</span>
+          <textarea data-f="ref_text" rows="2" data-i18n-placeholder="ph.refText"
+            placeholder="This is the exact transcript of the reference audio."></textarea>
+        </label>
+        <label><span data-i18n="field.descOptional">DESCRIPTION (OPTIONAL, SAVED WITH THE VOICE)</span>
+          <textarea data-f="save_desc" rows="2" data-i18n-placeholder="ph.saveDesc"
+            placeholder="Gravelly older narrator, slow and warm. Good for audiobooks."></textarea>
+        </label>
+        <div class="row saverow">
+          <label><span data-i18n="field.saveAs">SAVE AS</span>
+            <input data-f="save_name" type="text" data-i18n-placeholder="ph.saveName" placeholder="my_voice" />
+          </label>
+          <button class="save-voice" data-i18n="btn.saveVoice">SAVE VOICE</button>
+        </div>
+      </div>
+      <div class="row">
+        <label><span data-i18n="field.cfg">CFG SCALE</span>
+          <input data-f="cfg" type="number" value="1" min="1" max="10" step="0.5" />
+        </label>
+        <label><span data-i18n="field.seed">SEED</span>
+          <input data-f="seed" type="number" value="42" />
+        </label>
+      </div>
+      <button class="go" data-i18n="btn.generate">GENERATE</button>
+    </section>
+
+    <section class="panel" id="changer">
+      <p class="note" data-i18n="note.changer">respeaks an existing recording in another voice, keeping its words and
+        timing. no text needed. pitch normally comes from the target voice, so raise KEEP MELODY if the source is sung
+        or strongly intonated.</p>
+      <label><span data-i18n="field.sourceAudio">SOURCE AUDIO (WAV)</span>
+        <input data-f="source" type="file" accept="audio/*" />
+      </label>
+      <label><span data-i18n="field.savedVoice">SAVED VOICE</span>
+        <select data-f="voice_id">
+          <option value="" data-i18n="option.upload">upload a clip instead</option>
+        </select>
+      </label>
+      <p class="voice-desc"></p>
+      <div class="refblock">
+        <label><span data-i18n="field.targetVoice">TARGET VOICE (WAV)</span>
+          <input data-f="ref_audio" type="file" accept="audio/*" />
+        </label>
+        <label><span data-i18n="field.targetRefText">TARGET VOICE TRANSCRIPT (EXACT)</span>
+          <textarea data-f="ref_text" rows="2" data-i18n-placeholder="ph.targetRefText"
+            placeholder="This is the exact transcript of the target voice clip."></textarea>
+        </label>
+        <label><span data-i18n="field.descOptional">DESCRIPTION (OPTIONAL, SAVED WITH THE VOICE)</span>
+          <textarea data-f="save_desc" rows="2" data-i18n-placeholder="ph.saveDesc"
+            placeholder="Gravelly older narrator, slow and warm. Good for audiobooks."></textarea>
+        </label>
+        <div class="row saverow">
+          <label><span data-i18n="field.saveAs">SAVE AS</span>
+            <input data-f="save_name" type="text" data-i18n-placeholder="ph.saveName" placeholder="my_voice" />
+          </label>
+          <button class="save-voice" data-i18n="btn.saveVoice">SAVE VOICE</button>
+        </div>
+      </div>
+      <label><span data-i18n="field.sourceText">SOURCE TRANSCRIPT (OPTIONAL, SHARPENS THE WORDS)</span>
+        <textarea data-f="text" rows="2" data-i18n-placeholder="ph.sourceText"
+          placeholder="Leave empty unless you have the exact words of the source."></textarea>
+      </label>
+      <div class="row">
+        <label><span data-i18n="field.keepMelody">KEEP MELODY</span>
+          <input data-f="keep_acoustic" type="number" value="0" min="0" max="6" step="1" />
+        </label>
+        <label><span data-i18n="field.seed">SEED</span>
+          <input data-f="seed" type="number" value="42" />
+        </label>
+      </div>
+      <button class="go" data-i18n="btn.convert">CONVERT</button>
+    </section>
+
+    <section class="panel" id="library">
+      <div class="row libbar">
+        <label class="grow"><span data-i18n="field.filter">FILTER</span>
+          <input id="libfilter" type="text" data-i18n-placeholder="ph.filter"
+            placeholder="name, description, transcript or field" />
+        </label>
+        <button id="librefresh" class="ghost" data-i18n="btn.refresh">REFRESH</button>
+      </div>
+      <p class="note" id="libcount"></p>
+      <div id="liblist"></div>
+    </section>
+
+    <section class="output">
+      <div class="row">
+        <label class="toggle"><input id="stream" type="checkbox" checked /> <span data-i18n="output.stream">STREAM WHILE
+            GENERATING</span></label>
+        <label class="slider"><span class="slider-label"><span data-i18n="output.buffer">BUFFER</span> <output
+              id="bufval">1.25s</output></span>
+          <input id="buffer" type="range" min="0" max="4" step="0.25" value="1.25" />
+        </label>
+      </div>
+      <div class="status" id="status" role="status" aria-live="polite"></div>
+      <button id="stop" class="stop" data-i18n="btn.stop">STOP</button>
+      <audio id="player" controls></audio>
+      <a id="download" class="dl" download="breeze.wav" data-i18n="btn.download">DOWNLOAD WAV</a>
+    </section>
+  </main>
+
+  <footer data-i18n="footer.hint">vocal events go inline in parentheses, (laugh) (sigh) (gasp) (yawn) (whispers), or
+    square brackets in chinese, [笑] [叹气]. the tag is plain text so other ones often work too, reroll the seed if it gets
+    read out loud instead</footer>
+  <script src="/i18n.js"></script>
+  <script src="/app.js"></script>
 </body>
+
 </html>

@@ -275,7 +275,7 @@
 
   function detect() {
     let saved = null;
-    try { saved = localStorage.getItem(STORE_KEY); } catch (e) {}
+    try { saved = localStorage.getItem(STORE_KEY); } catch (e) { }
     if (saved && DICT[saved]) return saved;
     const nav = (navigator.languages && navigator.languages[0]) || navigator.language || "";
     return /^zh/i.test(nav) ? "zh" : "en";
@@ -285,7 +285,7 @@
     const value = DICT[next] ? next : "en";
     if (value === lang) { syncButtons(); return; }
     lang = value;
-    try { localStorage.setItem(STORE_KEY, lang); } catch (e) {}
+    try { localStorage.setItem(STORE_KEY, lang); } catch (e) { }
     apply();
     syncButtons();
     listeners.forEach(function (fn) { fn(lang); });
