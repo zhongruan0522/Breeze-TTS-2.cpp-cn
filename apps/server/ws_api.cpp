@@ -6,6 +6,7 @@
 #include "breeze/scheduler.h"
 
 #include <atomic>
+#include <chrono>
 #include <condition_variable>
 #include <cstdio>
 #include <deque>
@@ -105,7 +106,8 @@ static void event(WsConn & c, const std::string & type, const std::string & extr
 }
 
 // drains the queue one piece at a time, taking a slot for each so other connections interleave
-static void speaker(WsConn & conn, Session & s, GenScheduler & sched) {
+static void speaker(WsConn & conn, Session & s, GenScheduler & sched, bool verbose) {
+    int piece_no = 0;
     for (;;) {
         Piece piece;
         {
@@ -138,14 +140,35 @@ static void speaker(WsConn & conn, Session & s, GenScheduler & sched) {
         }
         event(conn, "speaking", "\"text\":\"" + esc(piece.text) + "\"");
 
+        GenTimings tm;
+        const auto t0 = std::chrono::steady_clock::now();
         int sent = 0;
         const bool ok = s.gen.speak(piece.text, [&](const float * a, int n) {
             if (s.cancel || !conn.alive()) return false;
             std::vector<uint8_t> pcm = to_pcm16(a, n);
             sent += n;
             return conn.send_binary(pcm.data(), pcm.size());
-        });
+        }, &tm);
         sched.release(s.cost);
+
+        // speed log: one line per spoken piece. audio seconds come from the frame count
+        // (80 ms each), wall seconds wrap only speak() so queue wait is excluded.
+        if (tm.frames > 0) {
+            const double secs = tm.frames * 0.08;
+            const double wall = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
+            const double rtf = wall > 0 ? secs / wall : 0;
+            std::string preview = esc(piece.text);
+            if (preview.size() > 24) preview.resize(24);
+            printf("ws  #%-3d \"%s\"  %.2fs audio in %.2fs, %.2fx | %d frames, %d flushes, first %.0f ms",
+                   piece_no, preview.c_str(), secs, wall, rtf, tm.frames, tm.flushes, tm.first_audio);
+            if (verbose) {
+                printf(" | per frame: backbone %.2f  depth %.2f  vocoder %.2f ms",
+                       tm.backbone / tm.frames, tm.depth / tm.frames, tm.vocoder / tm.frames);
+            }
+            printf("\n");
+            fflush(stdout);
+        }
+        piece_no++;
 
         if (s.cancel) { event(conn, "cancelled"); s.cancel = false; continue; }
         if (!ok && !conn.alive()) return;
@@ -193,9 +216,9 @@ static void handle_start(WsConn & conn, Session & s, const JVal & msg, BreezeMod
 }
 
 void ws_connection(WsConn & conn, BreezeModel & model, MimiCodec & codec, VoiceStore & store,
-                   GenScheduler & sched, int chunk_first, int chunk_max, int split_chars) {
+                   GenScheduler & sched, int chunk_first, int chunk_max, int split_chars, bool verbose) {
     Session s;
-    std::thread worker([&] { speaker(conn, s, sched); });
+    std::thread worker([&] { speaker(conn, s, sched, verbose); });
     event(conn, "ready", "\"sample_rate\":24000,\"format\":\"s16le\"");
 
     std::string raw;

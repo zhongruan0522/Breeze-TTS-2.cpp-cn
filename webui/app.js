@@ -311,6 +311,7 @@ function wsGenerate(panel, tabName) {
 
     let sr = 24000;
     let p = null;
+    let t0 = 0; // wall clock since generation started, for the status display
     const done = () => {
       const pcm = p ? p.finish() : new Uint8Array(0);
       if (pcm.length) {
@@ -331,7 +332,7 @@ function wsGenerate(panel, tabName) {
       if (ev.data instanceof ArrayBuffer) {
         if (!p) p = makePlayer(sr, streaming ? lead : 1e9);
         p.push(new Uint8Array(ev.data));
-        const secs = (p.samples / sr).toFixed(2);
+        const secs = t0 ? ((performance.now() - t0) / 1000).toFixed(1) : "0.0";
         if (p.underruns) {
           setStatus(streaming ? "status.streamingRebuffer" : "status.generatingRebuffer",
             { secs: secs, n: p.underruns });
@@ -343,6 +344,7 @@ function wsGenerate(panel, tabName) {
       const m = JSON.parse(ev.data);
       if (m.type === "ready") {
         sr = m.sample_rate || 24000;
+        t0 = performance.now();
         sock.send(JSON.stringify({
           type: "start",
           voice_id: voice,
@@ -357,13 +359,15 @@ function wsGenerate(panel, tabName) {
       } else if (m.type === "queued") {
         setStatus("status.queued");
       } else if (m.type === "cancelled") {
-        if (p) setStatus("status.stoppedSecs", { secs: (p.samples / sr).toFixed(2) });
+        if (p) setStatus("status.stoppedSecs", { secs: t0 ? ((performance.now() - t0) / 1000).toFixed(1) : "0.0" });
         else setStatus("status.stopped");
         done();
       } else if (m.type === "done") {
-        const secs = p ? p.samples / sr : 0;
+        const audio = p ? p.samples / sr : 0;
+        const wall = t0 ? (performance.now() - t0) / 1000 : 0;
+        const rtf = wall > 0 ? (audio / wall).toFixed(2) : "0.00";
         done();
-        setStatus("status.done", { secs: secs.toFixed(2), sr: sr });
+        setStatus("status.done", { audio: audio.toFixed(2), wall: wall.toFixed(2), rtf: rtf, sr: sr });
         if (!streaming) player.play().catch(() => { });
       } else if (m.type === "error") {
         setStatus("status.error", { msg: m.message || t("status.unknown") });
@@ -398,6 +402,7 @@ async function generate(panel, tabName) {
   const btn = panel.querySelector(".go");
   btn.disabled = true;
   setStatus(streaming ? "status.streamingShort" : "status.generatingShort");
+  const t0 = performance.now();
   download.classList.remove("ready");
   player.pause();
   player.removeAttribute("src");
@@ -416,11 +421,12 @@ async function generate(panel, tabName) {
     const pcm = streaming
       ? await readStreaming(res, sr, Number(bufferInput.value),
         (s, under) => {
-          if (under) setStatus("status.streamingRebuffer", { secs: s.toFixed(2), n: under });
-          else setStatus("status.streaming", { secs: s.toFixed(2) });
+          const secs = ((performance.now() - t0) / 1000).toFixed(1);
+          if (under) setStatus("status.streamingRebuffer", { secs: secs, n: under });
+          else setStatus("status.streaming", { secs: secs });
         })
       : await readBuffered(res, b => {
-        setStatus("status.generating", { secs: (b / 2 / sr).toFixed(2) });
+        setStatus("status.generating", { secs: ((performance.now() - t0) / 1000).toFixed(1) });
       });
 
     const url = URL.createObjectURL(makeWav(pcm.buffer, sr));
@@ -428,7 +434,10 @@ async function generate(panel, tabName) {
     player.classList.add("ready");
     download.href = url;
     download.classList.add("ready");
-    setStatus("status.done", { secs: (pcm.length / 2 / sr).toFixed(2), sr: sr });
+    const doneAudio = pcm.length / 2 / sr;
+    const doneWall = (performance.now() - t0) / 1000;
+    const doneRtf = doneWall > 0 ? (doneAudio / doneWall).toFixed(2) : "0.00";
+    setStatus("status.done", { audio: doneAudio.toFixed(2), wall: doneWall.toFixed(2), rtf: doneRtf, sr: sr });
     if (!streaming) player.play().catch(() => { });
   } catch (e) {
     setStatus("status.error", { msg: e.message });
@@ -465,6 +474,7 @@ async function convert(panel) {
   const btn = panel.querySelector(".go");
   btn.disabled = true;
   setStatus("status.converting");
+  const t0 = performance.now();
   download.classList.remove("ready");
   player.pause();
   player.removeAttribute("src");
@@ -480,14 +490,17 @@ async function convert(panel) {
     }
     const sr = parseInt(res.headers.get("X-Sample-Rate") || "24000", 10);
     const pcm = await readBuffered(res, b => {
-      setStatus("status.receiving", { secs: (b / 2 / sr).toFixed(2) });
+      setStatus("status.receiving", { secs: ((performance.now() - t0) / 1000).toFixed(1) });
     });
     const url = URL.createObjectURL(makeWav(pcm.buffer, sr));
     player.src = url;
     player.classList.add("ready");
     download.href = url;
     download.classList.add("ready");
-    setStatus("status.done", { secs: (pcm.length / 2 / sr).toFixed(2), sr: sr });
+    const doneAudio = pcm.length / 2 / sr;
+    const doneWall = (performance.now() - t0) / 1000;
+    const doneRtf = doneWall > 0 ? (doneAudio / doneWall).toFixed(2) : "0.00";
+    setStatus("status.done", { audio: doneAudio.toFixed(2), wall: doneWall.toFixed(2), rtf: doneRtf, sr: sr });
     player.play().catch(() => { });
   } catch (e) {
     setStatus("status.error", { msg: e.message });
