@@ -18,7 +18,7 @@ jobs:
     # 22.04 keeps the glibc floor low enough for most distros still in support
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           submodules: recursive
 
@@ -52,11 +52,6 @@ jobs:
           "build/$name/breeze-server" --help
           tar -C build -czf "$name.tar.gz" "$name"
           echo "name=$name" >> "$GITHUB_OUTPUT"
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: ${{ steps.pkg.outputs.name }}
-          path: ${{ steps.pkg.outputs.name }}.tar.gz
 
       - name: Attach to release
         if: ${{ github.event.release.tag_name || inputs.tag }}

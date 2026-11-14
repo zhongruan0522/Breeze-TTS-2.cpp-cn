@@ -22,9 +22,10 @@ done
 cp "$build/$lib" "$out/"
 [ -f "$build/libbreeze.dll.a" ] && cp "$build/libbreeze.dll.a" "$out/"
 cp -r "$root/include" "$out/"
-cp "$root/README.md" "$root/LICENSE" "$out/"
-mkdir -p "$out/docs"
+cp "$root/README.md" "$root/README.zh-CN.md" "$root/LICENSE" "$out/"
+mkdir -p "$out/docs" "$out/docs-zh"
 cp "$root"/docs/*.md "$out/docs/"
+cp "$root"/docs-zh/*.md "$out/docs-zh/"
 
 # ggml and httplib are mit and want their notice shipped, shine is lgpl and wants its full text
 notices="$out/THIRD_PARTY_NOTICES.txt"

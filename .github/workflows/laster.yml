@@ -1,6 +1,6 @@
 name: Laster 预发布
 
-# 每次推送到 main 时并行构建 Linux 与 Windows，打包后覆盖写入名为 Laster 的预发行版。
+# 每次推送到 main 时构建 Linux 与 Windows，产物直接写入名为 Laster 的预发行版（不产生 Actions 构件）。
 # Laster tag 始终指向最新提交，发行正文动态写入构建时间。
 on:
   push:
@@ -16,8 +16,45 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  release:
+    name: 创建/覆盖 Laster 预发行版
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 1
+
+      - name: 创建/覆盖 Laster 预发行版
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -e
+          BUILD_TIME=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
+          SHA_SHORT=${GITHUB_SHA::7}
+          {
+            echo "构建时间：${BUILD_TIME}"
+            echo "提交：${SHA_SHORT}"
+            echo "分支：${GITHUB_REF_NAME}"
+            echo ""
+            echo "每次推送到 main 时自动构建并覆盖；这不是稳定版本，仅供最新尝鲜。"
+          } > NOTES.md
+          # 用 token 配置远程，强制把 Laster tag 移到当前提交（自动覆盖）
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}"
+          git tag -f Laster "$GITHUB_SHA"
+          git push -f origin refs/tags/Laster
+          # 首次创建（不带资产，资产由构建 job 直接上传）；若已存在则更新正文
+          if gh release create Laster --prerelease --title "Laster（最新）" --notes-file NOTES.md 2>/dev/null; then
+            echo "created Laster prerelease"
+          else
+            gh release edit Laster --title "Laster（最新）" --notes-file NOTES.md
+          fi
+
   build:
     name: 构建 ${{ matrix.platform }}
+    needs: release
     strategy:
       fail-fast: false
       matrix:
@@ -33,7 +70,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           submodules: recursive
 
@@ -48,7 +85,7 @@ jobs:
 
       - name: ccache 缓存 (Linux)
         if: matrix.platform == 'linux'
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: /home/runner/.ccache
           key: ccache-linux-${{ github.sha }}
@@ -99,7 +136,7 @@ jobs:
 
       - name: ccache 缓存 (Windows)
         if: matrix.platform == 'windows'
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: .ccache
           key: ccache-windows-${{ github.sha }}
@@ -129,53 +166,8 @@ jobs:
         shell: pwsh
         run: 7z a -tzip "${{ matrix.pkg }}.zip" "build/${{ matrix.pkg }}"
 
-      # ============ 上传构件 ============
-      - name: 上传构件
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ matrix.pkg }}
-          path: ${{ matrix.pkg }}.${{ matrix.archive }}
-
-  release:
-    name: 发布 Laster 预发行版
-    needs: build
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 1
-
-      - name: 下载构件
-        uses: actions/download-artifact@v4
-        with:
-          path: assets
-          merge-multiple: true
-
-      - name: 创建/覆盖 Laster 预发行版
+      # ============ 上传到 Laster 预发行版 ============
+      - name: 上传到 Laster 预发行版
         env:
           GH_TOKEN: ${{ github.token }}
-        run: |
-          set -e
-          BUILD_TIME=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
-          SHA_SHORT=${GITHUB_SHA::7}
-          {
-            echo "构建时间：${BUILD_TIME}"
-            echo "提交：${SHA_SHORT}"
-            echo "分支：${GITHUB_REF_NAME}"
-            echo ""
-            echo "每次推送到 main 时自动构建并覆盖；这不是稳定版本，仅供最新尝鲜。"
-          } > NOTES.md
-          # 用 token 配置远程，强制把 Laster tag 移到当前提交（自动覆盖）
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}"
-          git tag -f Laster "$GITHUB_SHA"
-          git push -f origin refs/tags/Laster
-          # 首次创建；若已存在则更新正文并覆盖资产
-          if gh release create Laster --prerelease --title "Laster（最新）" --notes-file NOTES.md assets/*.tar.gz assets/*.zip 2>/dev/null; then
-            echo "created Laster prerelease"
-          else
-            gh release edit Laster --title "Laster（最新）" --notes-file NOTES.md
-            gh release upload Laster assets/*.tar.gz assets/*.zip --clobber
-          fi
+        run: gh release upload Laster "${{ matrix.pkg }}.${{ matrix.archive }}" --clobber
