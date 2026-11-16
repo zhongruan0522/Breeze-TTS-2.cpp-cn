@@ -177,9 +177,11 @@ function openContext(sampleRate) {
   return audioCtx;
 }
 
-// holds chunks back until there is a real cushion of audio, then plays them gapless
+// holds chunks back until there is a real cushion of audio, then plays them gapless.
+// a lead of Infinity collects chunks only: nothing is ever scheduled through WebAudio,
+// the caller plays the finished PCM through the audio element instead.
 function makePlayer(sr, lead) {
-  const ac = openContext(sr);
+  const ac = lead === Infinity ? null : openContext(sr);
   const parts = [];
   let leftover = new Uint8Array(0);
   let playhead = 0;
@@ -217,6 +219,8 @@ function makePlayer(sr, lead) {
       // a chunk boundary can split a sample, so carry the odd byte over
       leftover = bytes.slice(n * 2);
       if (!n) return;
+      samples += n;
+      if (!ac) return;
 
       const view = new DataView(bytes.buffer, bytes.byteOffset, n * 2);
       const buf = ac.createBuffer(1, n, sr);
@@ -231,14 +235,13 @@ function makePlayer(sr, lead) {
       } else {
         play(buf);
       }
-      samples += n;
     },
     finish() {
-      if (queued) queued.forEach(play);
+      if (queued && ac) queued.forEach(play);
       queued = null;
       return join(parts);
     },
-    stop() { try { ac.close(); } catch (e) { } return join(parts); },
+    stop() { if (ac) { try { ac.close(); } catch (e) { } } return join(parts); },
     get samples() { return samples; },
     get underruns() { return underruns; }
   };
@@ -330,7 +333,7 @@ function wsGenerate(panel, tabName) {
 
     sock.onmessage = ev => {
       if (ev.data instanceof ArrayBuffer) {
-        if (!p) p = makePlayer(sr, streaming ? lead : 1e9);
+        if (!p) p = makePlayer(sr, streaming ? lead : Infinity);
         p.push(new Uint8Array(ev.data));
         const secs = t0 ? ((performance.now() - t0) / 1000).toFixed(1) : "0.0";
         if (p.underruns) {
